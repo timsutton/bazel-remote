@@ -29,6 +29,7 @@ go_library(
         "@com_github_mostynb_go_grpc_compression//snappy:go_default_library",
         "@com_github_mostynb_go_grpc_compression//zstd:go_default_library",
         "@com_github_mostynb_zstdpool_syncpool//:go_default_library",
+        "@com_github_zeebo_blake3//:go_default_library",
         "@org_golang_google_genproto_googleapis_bytestream//:go_default_library",
         "@org_golang_google_genproto_googleapis_rpc//code:go_default_library",
         "@org_golang_google_genproto_googleapis_rpc//status:go_default_library",

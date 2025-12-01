@@ -143,10 +143,12 @@ func run(ctx *cli.Context) error {
 	if c.StorageMode == "zstd" {
 		log.Println("Zstandard implementation:", c.ZstdImplementation)
 	}
+	log.Println("Hash function:", c.HashFunction)
 
 	opts := []disk.Option{
 		disk.WithStorageMode(c.StorageMode),
 		disk.WithZstdImplementation(c.ZstdImplementation),
+		disk.WithHashFunction(c.HashFunction),
 		disk.WithMaxBlobSize(c.MaxBlobSize),
 		disk.WithProxyMaxBlobSize(c.MaxProxyBlobSize),
 		disk.WithMaxSizeHardLimit(int64(c.MaxSizeHardLimit) * 1024 * 1024 * 1024),
@@ -249,7 +251,7 @@ func startHttpServer(c *config.Config, httpServer **http.Server,
 	checkClientCertForWrites := c.TLSCaFile != ""
 	validateAC := !c.DisableHTTPACValidation
 	h := server.NewHTTPCache(diskCache, c.AccessLogger, c.ErrorLogger, validateAC,
-		c.EnableACKeyInstanceMangling, checkClientCertForReads, checkClientCertForWrites, gitCommit, gitTags,
+		c.EnableACKeyInstanceMangling, checkClientCertForReads, checkClientCertForWrites, c.HashFunction, gitCommit, gitTags,
 		c.MaxBlobSize)
 
 	cacheHandler := h.CacheHandler
@@ -462,6 +464,7 @@ func startGrpcServer(c *config.Config, grpcServer **grpc.Server,
 		c.EnableACKeyInstanceMangling,
 		enableRemoteAssetAPI,
 		c.MaxBlobSize,
+		c.HashFunction,
 		diskCache, c.AccessLogger, c.ErrorLogger)
 }
 

@@ -74,6 +74,7 @@ type diskCache struct {
 	proxy            cache.Proxy
 	storageMode      casblob.CompressionType
 	zstd             zstdimpl.ZstdImpl
+	hashFunction     string
 	maxBlobSize      int64
 	maxProxyBlobSize int64
 	accessLogger     *log.Logger
@@ -94,6 +95,7 @@ type diskCache struct {
 
 const sha256HashStrSize = sha256.Size * 2 // Two hex characters per byte.
 const emptySha256 = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+const emptyBlake3 = "af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262"
 
 func internalErr(err error) *cache.Error {
 	return &cache.Error{
@@ -373,7 +375,7 @@ func (c *diskCache) writeAndCloseFile(ctx context.Context, r io.Reader, kind cac
 	var sizeOnDisk int64
 
 	if kind == cache.CAS && c.storageMode != casblob.Identity {
-		sizeOnDisk, err = casblob.WriteAndClose(c.zstd, r, f, c.storageMode, hash, size)
+		sizeOnDisk, err = casblob.WriteAndClose(c.zstd, r, f, c.storageMode, c.hashFunction, hash, size)
 		if err != nil {
 			return -1, annotate.Err(ctx, "Failed to write compressed CAS blob to disk", err)
 		}
@@ -383,7 +385,13 @@ func (c *diskCache) writeAndCloseFile(ctx context.Context, r io.Reader, kind cac
 
 	var writeCloser io.WriteCloser = f
 	if kind == cache.CAS { // c.storageMode == casblob.Identity
-		writeCloser = sha256verifier.New(hash, size, f)
+		var algorithm sha256verifier.HashAlgorithm
+		if c.hashFunction == "blake3" {
+			algorithm = sha256verifier.BLAKE3
+		} else {
+			algorithm = sha256verifier.SHA256
+		}
+		writeCloser = sha256verifier.NewWithAlgorithm(algorithm, hash, size, f)
 	}
 
 	sizeOnDisk, err = io.Copy(writeCloser, r)

@@ -32,6 +32,7 @@ import (
 const (
 	hashKeyLength = 64
 	emptySha256   = "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+	emptyBlake3   = "af1349b9f5f9a1a6a0404dea36dcc9499bcb25c9adc112b7cc9a93cae41f3262"
 )
 
 const grpcHealthServiceName = "/grpc.health.v1.Health/Check"
@@ -43,6 +44,7 @@ type grpcServer struct {
 	depsCheck           bool
 	mangleACKeys        bool
 	maxCasBlobSizeBytes int64
+	hashFunction        string
 }
 
 var readOnlyMethods = map[string]struct{}{
@@ -64,6 +66,7 @@ func ListenAndServeGRPC(
 	mangleACKeys bool,
 	enableRemoteAssetAPI bool,
 	maxCasBlobSizeBytes int64,
+	hashFunction string,
 	c disk.Cache, a cache.Logger, e cache.Logger) error {
 
 	listener, err := net.Listen(network, addr)
@@ -71,7 +74,7 @@ func ListenAndServeGRPC(
 		return err
 	}
 
-	return ServeGRPC(listener, srv, validateACDeps, mangleACKeys, enableRemoteAssetAPI, maxCasBlobSizeBytes, c, a, e)
+	return ServeGRPC(listener, srv, validateACDeps, mangleACKeys, enableRemoteAssetAPI, maxCasBlobSizeBytes, hashFunction, c, a, e)
 }
 
 func ServeGRPC(l net.Listener, srv *grpc.Server,
@@ -79,6 +82,7 @@ func ServeGRPC(l net.Listener, srv *grpc.Server,
 	mangleACKeys bool,
 	enableRemoteAssetAPI bool,
 	maxCasBlobSizeBytes int64,
+	hashFunction string,
 	c disk.Cache, a cache.Logger, e cache.Logger) error {
 
 	s := &grpcServer{
@@ -88,6 +92,7 @@ func ServeGRPC(l net.Listener, srv *grpc.Server,
 		depsCheck:           validateACDepsCheck,
 		mangleACKeys:        mangleACKeys,
 		maxCasBlobSizeBytes: maxCasBlobSizeBytes,
+		hashFunction:        hashFunction,
 	}
 	pb.RegisterActionCacheServer(srv, s)
 	pb.RegisterCapabilitiesServer(srv, s)
@@ -111,9 +116,17 @@ func (s *grpcServer) GetCapabilities(ctx context.Context,
 
 	// Instance name is currently ignored.
 
+	// Determine which digest function to report based on configuration
+	var digestFunctions []pb.DigestFunction_Value
+	if s.hashFunction == "blake3" {
+		digestFunctions = []pb.DigestFunction_Value{pb.DigestFunction_BLAKE3}
+	} else {
+		digestFunctions = []pb.DigestFunction_Value{pb.DigestFunction_SHA256}
+	}
+
 	resp := pb.ServerCapabilities{
 		CacheCapabilities: &pb.CacheCapabilities{
-			DigestFunctions: []pb.DigestFunction_Value{pb.DigestFunction_SHA256},
+			DigestFunctions: digestFunctions,
 			ActionCacheUpdateCapabilities: &pb.ActionCacheUpdateCapabilities{
 				UpdateEnabled: true,
 			},
@@ -145,11 +158,11 @@ func (s *grpcServer) GetCapabilities(ctx context.Context,
 // Return an error if `hash` is not a valid cache key.
 func (s *grpcServer) validateHash(hash string, size int64, logPrefix string) error {
 	if size == int64(0) {
-		if hash == emptySha256 {
+		if hash == emptySha256 || hash == emptyBlake3 {
 			return nil
 		}
 
-		msg := "Invalid zero-length SHA256 hash"
+		msg := "Invalid zero-length hash (expected SHA256 or BLAKE3 empty hash)"
 		s.accessLogger.Printf("%s %s: %s", logPrefix, hash, msg)
 		return status.Error(codes.InvalidArgument, msg)
 	}

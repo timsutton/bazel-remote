@@ -7,12 +7,14 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	hashpkg "hash"
 	"io"
 	"log"
 	"os"
 	"sync"
 
 	"github.com/buchgr/bazel-remote/v2/cache/disk/zstdimpl"
+	"github.com/zeebo/blake3"
 )
 
 type CompressionType uint8
@@ -519,7 +521,7 @@ var chunkBufferPool = &sync.Pool{
 
 // Read from r and write to f, using CompressionType t.
 // Return the size on disk or an error if something went wrong.
-func WriteAndClose(zstd zstdimpl.ZstdImpl, r io.Reader, f *os.File, t CompressionType, hash string, size int64) (int64, error) {
+func WriteAndClose(zstd zstdimpl.ZstdImpl, r io.Reader, f *os.File, t CompressionType, hashAlgorithm string, hash string, size int64) (int64, error) {
 	var err error
 	defer func() { _ = f.Close() }()
 
@@ -559,7 +561,12 @@ func WriteAndClose(zstd zstdimpl.ZstdImpl, r io.Reader, f *os.File, t Compressio
 	var n int64
 
 	if t == Identity {
-		hasher := sha256.New()
+		var hasher hashpkg.Hash
+		if hashAlgorithm == "blake3" {
+			hasher = blake3.New()
+		} else {
+			hasher = sha256.New()
+		}
 
 		n, err = io.Copy(io.MultiWriter(f, hasher), r)
 		if err != nil {
@@ -592,7 +599,12 @@ func WriteAndClose(zstd zstdimpl.ZstdImpl, r io.Reader, f *os.File, t Compressio
 	}()
 	uncompressedChunk := *chunkBufferPtr
 
-	hasher := sha256.New()
+	var hasher hashpkg.Hash
+	if hashAlgorithm == "blake3" {
+		hasher = blake3.New()
+	} else {
+		hasher = sha256.New()
+	}
 
 	for nextChunk < len(h.chunkOffsets)-1 {
 		h.chunkOffsets[nextChunk] = fileOffset

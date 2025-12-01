@@ -58,7 +58,7 @@ func (s *grpcServer) GetActionResult(ctx context.Context,
 	}
 
 	if s.mangleACKeys {
-		req.ActionDigest.Hash = cache.TransformActionCacheKey(req.ActionDigest.Hash, req.InstanceName, s.accessLogger)
+		req.ActionDigest.Hash = cache.TransformActionCacheKey(req.ActionDigest.Hash, req.InstanceName, s.hashFunction, s.accessLogger)
 	}
 
 	err := s.validateHash(req.ActionDigest.Hash, req.ActionDigest.SizeBytes, logPrefix)
@@ -234,7 +234,7 @@ func (s *grpcServer) UpdateActionResult(ctx context.Context,
 	}
 
 	if s.mangleACKeys {
-		req.ActionDigest.Hash = cache.TransformActionCacheKey(req.ActionDigest.Hash, req.InstanceName, s.accessLogger)
+		req.ActionDigest.Hash = cache.TransformActionCacheKey(req.ActionDigest.Hash, req.InstanceName, s.hashFunction, s.accessLogger)
 	}
 
 	err := s.validateHash(req.ActionDigest.Hash, req.ActionDigest.SizeBytes, logPrefix)

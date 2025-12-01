@@ -99,6 +99,7 @@ type Config struct {
 	MaxSizeHardLimit            int                       `yaml:"max_size_hard_limit"`
 	StorageMode                 string                    `yaml:"storage_mode"`
 	ZstdImplementation          string                    `yaml:"zstd_implementation"`
+	HashFunction                string                    `yaml:"hash_function"`
 	HtpasswdFile                string                    `yaml:"htpasswd_file"`
 	LDAP                        *LDAPConfig               `yaml:"ldap,omitempty"`
 	MinTLSVersion               string                    `yaml:"min_tls_version"`
@@ -156,6 +157,7 @@ var defaultDurationBuckets = []float64{.5, 1, 2.5, 5, 10, 20, 40, 80, 160, 320}
 // newFromArgs returns a validated Config with the specified values, and
 // an error if there were any problems with the validation.
 func newFromArgs(dir string, maxSize int, storageMode string, zstdImplementation string,
+	hashFunction string,
 	httpAddress string, grpcAddress string,
 	profileAddress string,
 	htpasswdFile string,
@@ -196,6 +198,7 @@ func newFromArgs(dir string, maxSize int, storageMode string, zstdImplementation
 		MaxSizeHardLimit:            maxSizeHardLimit,
 		StorageMode:                 storageMode,
 		ZstdImplementation:          zstdImplementation,
+		HashFunction:                hashFunction,
 		HtpasswdFile:                htpasswdFile,
 		MaxQueuedUploads:            maxQueuedUploads,
 		NumUploaders:                numUploaders,
@@ -256,6 +259,7 @@ func NewFromYaml(data []byte) (*Config, error) {
 		Config: Config{
 			StorageMode:            "zstd",
 			ZstdImplementation:     "go",
+			HashFunction:           "sha256",
 			NumUploaders:           100,
 			MinTLSVersion:          "1.0",
 			MaxQueuedUploads:       1000000,
@@ -311,6 +315,9 @@ func validateConfig(c *Config) error {
 	}
 	if c.ZstdImplementation != "go" && c.ZstdImplementation != "cgo" {
 		return errors.New("zstd_implementation must be set to either \"go\" or \"cgo\", got: " + c.ZstdImplementation)
+	}
+	if c.HashFunction != "sha256" && c.HashFunction != "blake3" {
+		return errors.New("hash_function must be set to either \"sha256\" or \"blake3\", got: " + c.HashFunction)
 	}
 
 	proxyCount := 0
@@ -643,11 +650,17 @@ func get(ctx *cli.Context) (*Config, error) {
 		}
 	}
 
+	hashFunction := ctx.String("hash_function")
+	if hashFunction == "" {
+		hashFunction = "sha256"
+	}
+
 	return newFromArgs(
 		ctx.String("dir"),
 		ctx.Int("max_size"),
 		ctx.String("storage_mode"),
 		ctx.String("zstd_implementation"),
+		hashFunction,
 		httpAddress,
 		grpcAddress,
 		profileAddress,

@@ -257,7 +257,7 @@ func (d proxyStub) Get(ctx context.Context, kind cache.EntryKind, hash string, _
 		zi,
 		io.NopCloser(
 			strings.NewReader(contents)), tmpfile, casblob.Zstandard,
-		hash, contentsLength)
+		"sha256", hash, contentsLength)
 	if err != nil {
 		return nil, -1, err
 	}
@@ -432,7 +432,7 @@ func TestCacheExistingFiles(t *testing.T) {
 					t.Fatal(err)
 				}
 				_, err = casblob.WriteAndClose(zi, r, f, casblob.Zstandard,
-					it.hash, int64(len(it.contents)))
+					"sha256", it.hash, int64(len(it.contents)))
 			}
 		} else {
 			err = os.WriteFile(fp, []byte(it.contents), os.ModePerm)

@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"hash"
 	"io"
+
+	"github.com/zeebo/blake3"
 )
 
 type sha256verifier struct {
@@ -17,14 +19,37 @@ type sha256verifier struct {
 	originalWriteCloser io.WriteCloser
 }
 
+// HashAlgorithm represents the type of hash algorithm to use
+type HashAlgorithm string
+
+const (
+	SHA256 HashAlgorithm = "sha256"
+	BLAKE3 HashAlgorithm = "blake3"
+)
+
+// New creates a new hash verifier using SHA256
 func New(expectedHash string, expectedSize int64, writeCloser io.WriteCloser) *sha256verifier {
-	hash := sha256.New()
+	return NewWithAlgorithm(SHA256, expectedHash, expectedSize, writeCloser)
+}
+
+// NewWithAlgorithm creates a new hash verifier using the specified algorithm
+func NewWithAlgorithm(algorithm HashAlgorithm, expectedHash string, expectedSize int64, writeCloser io.WriteCloser) *sha256verifier {
+	var h hash.Hash
+
+	switch algorithm {
+	case BLAKE3:
+		h = blake3.New()
+	case SHA256:
+		fallthrough
+	default:
+		h = sha256.New()
+	}
 
 	return &sha256verifier{
-		Hash:                hash,
+		Hash:                h,
 		expectedHash:        expectedHash,
 		expectedSize:        expectedSize,
-		multiWriter:         io.MultiWriter(hash, writeCloser),
+		multiWriter:         io.MultiWriter(h, writeCloser),
 		originalWriteCloser: writeCloser,
 	}
 }

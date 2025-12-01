@@ -72,6 +72,7 @@ func New(dir string, maxSizeBytes int64, opts ...Option) (Cache, error) {
 		// Not using config here, to avoid test import cycles.
 		storageMode:      casblob.Zstandard,
 		zstd:             zi,
+		hashFunction:     "sha256",
 		maxBlobSize:      math.MaxInt64,
 		maxProxyBlobSize: math.MaxInt64,
 

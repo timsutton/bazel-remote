@@ -42,6 +42,16 @@ func WithZstdImplementation(impl string) Option {
 	}
 }
 
+func WithHashFunction(hashFunction string) Option {
+	return func(c *CacheConfig) error {
+		if hashFunction != "sha256" && hashFunction != "blake3" {
+			return fmt.Errorf("unsupported hash function: %s", hashFunction)
+		}
+		c.diskCache.hashFunction = hashFunction
+		return nil
+	}
+}
+
 func WithMaxBlobSize(size int64) Option {
 	return func(c *CacheConfig) error {
 		if size <= 0 {

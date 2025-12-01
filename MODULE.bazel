@@ -84,6 +84,11 @@ go_deps.module(
     sum = "h1:R2ZVGCZzU95oXFJxncosHS9LsX8N4/MYUdGGWOb2cFk=",
     version = "v0.4.1-0.20220112235402-e1cee1c72f2f",
 )
+go_deps.module(
+    path = "github.com/zeebo/blake3",
+    sum = "h1:KYQPkhpRtcqh0ssGYcKLG1JYvddkEA8QwCM/yBqhaZI=",
+    version = "v0.2.4",
+)
 go_deps.module_override(
     patch_strip = 1,
     patches = [
@@ -124,6 +129,7 @@ use_repo(
     "com_github_spf13_afero",
     "com_github_urfave_cli_v2",
     "com_github_valyala_gozstd",
+    "com_github_zeebo_blake3",
     "com_google_cloud_go_longrunning",
     "in_gopkg_mgo_v2",
     "in_gopkg_yaml_v3",

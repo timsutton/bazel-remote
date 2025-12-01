@@ -72,6 +72,12 @@ func GetCliFlags() []cli.Flag {
 			EnvVars: []string{"BAZEL_REMOTE_ZSTD_IMPLEMENTATION"},
 		},
 		&cli.StringFlag{
+			Name:    "hash_function",
+			Value:   "sha256",
+			Usage:   "Hash function to use for content addressing. Must be one of \"sha256\" or \"blake3\".",
+			EnvVars: []string{"BAZEL_REMOTE_HASH_FUNCTION"},
+		},
+		&cli.StringFlag{
 			Name:    "http_address",
 			Usage:   "Address specification for the HTTP server listener, formatted either as [host]:port for TCP or unix://path.sock for Unix domain sockets.",
 			EnvVars: []string{"BAZEL_REMOTE_HTTP_ADDRESS"},

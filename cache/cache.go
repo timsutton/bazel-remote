@@ -4,7 +4,10 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"hash"
 	"io"
+
+	"github.com/zeebo/blake3"
 )
 
 // EntryKind describes the kind of cache entry
@@ -88,12 +91,17 @@ type Proxy interface {
 // TransformActionCacheKey takes an ActionCache key and an instance name
 // and returns a new ActionCache key to use instead. If the instance name
 // is empty, then the original key is returned unchanged.
-func TransformActionCacheKey(key, instance string, logger Logger) string {
+func TransformActionCacheKey(key, instance, hashAlgorithm string, logger Logger) string {
 	if instance == "" {
 		return key
 	}
 
-	h := sha256.New()
+	var h hash.Hash
+	if hashAlgorithm == "blake3" {
+		h = blake3.New()
+	} else {
+		h = sha256.New()
+	}
 	h.Write([]byte(key))
 	h.Write([]byte(instance))
 	b := h.Sum(nil)

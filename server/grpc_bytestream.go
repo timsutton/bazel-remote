@@ -14,6 +14,7 @@ import (
 
 	"github.com/buchgr/bazel-remote/v2/cache"
 	"github.com/buchgr/bazel-remote/v2/cache/disk/casblob"
+	"github.com/buchgr/bazel-remote/v2/utils/validate"
 
 	"github.com/buchgr/bazel-remote/v2/utils/zstdpool"
 	syncpool "github.com/mostynb/zstdpool-syncpool"
@@ -209,18 +210,40 @@ func (s *grpcServer) parseReadResource(name string, errorPrefix string) (string,
 	}
 
 	if foundBlobs {
-		if len(rem) != 2 {
+		// Format can be either:
+		// blobs/{hash}/{size} (old format, SHA256)
+		// blobs/{hash_function}/{hash}/{size} (new format with digest function)
+
+		var hash string
+		var sizeStr string
+
+		if len(rem) == 3 {
+			// New format with hash function: blobs/{hash_function}/{hash}/{size}
+			// Check if rem[0] looks like a hash function name
+			if len(rem[0]) < 64 && strings.ToLower(rem[0]) == rem[0] && !validate.HashKeyRegex.MatchString(rem[0]) {
+				hash = rem[1]
+				sizeStr = rem[2]
+			} else {
+				// Unexpected format
+				msg := fmt.Sprintf("Unable to parse resource name: %s", name)
+				s.accessLogger.Printf("%s: %s", errorPrefix, msg)
+				return "", 0, casblob.Identity,
+					status.Error(codes.InvalidArgument, msg)
+			}
+		} else if len(rem) == 2 {
+			// Old format: blobs/{hash}/{size}
+			hash = rem[0]
+			sizeStr = rem[1]
+		} else {
 			msg := fmt.Sprintf("Unable to parse resource name: %s", name)
 			s.accessLogger.Printf("%s: %s", errorPrefix, msg)
 			return "", 0, casblob.Identity,
 				status.Error(codes.InvalidArgument, msg)
 		}
 
-		hash := rem[0]
-
-		size, err := strconv.ParseInt(rem[1], 10, 64)
+		size, err := strconv.ParseInt(sizeStr, 10, 64)
 		if err != nil {
-			msg := fmt.Sprintf("Invalid size: %s from %q", rem[1], name)
+			msg := fmt.Sprintf("Invalid size: %s from %q", sizeStr, name)
 			s.accessLogger.Printf("%s: %s", errorPrefix, msg)
 			return "", 0, casblob.Identity,
 				status.Error(codes.InvalidArgument, msg)
@@ -305,11 +328,34 @@ func (s *grpcServer) parseWriteResource(r string) (string, int64, casblob.Compre
 	// rem[0] should hold the uuid, which we don't use- ignore it.
 
 	if rem[1] == "blobs" {
-		hash := rem[2]
-		size, err := strconv.ParseInt(rem[3], 10, 64)
+		// Format can be either:
+		// uploads/{uuid}/blobs/{hash}/{size} (old format, SHA256)
+		// uploads/{uuid}/blobs/{hash_function}/{hash}/{size} (new format with digest function)
+
+		var hash string
+		var sizeStr string
+
+		// Check if rem[2] looks like a hash function name (sha256, blake3, etc) or a hash
+		// Hash functions are lowercase ascii letters, hashes are hex digits
+		if len(rem[2]) < 64 && strings.ToLower(rem[2]) == rem[2] && !validate.HashKeyRegex.MatchString(rem[2]) {
+			// This looks like a hash function name, so the format is:
+			// uploads/{uuid}/blobs/{hash_function}/{hash}/{size}
+			if len(rem) < 5 {
+				return "", 0, casblob.Identity,
+					status.Errorf(codes.InvalidArgument, "Unable to parse resource name: %s", r)
+			}
+			hash = rem[3]
+			sizeStr = rem[4]
+		} else {
+			// Old format: uploads/{uuid}/blobs/{hash}/{size}
+			hash = rem[2]
+			sizeStr = rem[3]
+		}
+
+		size, err := strconv.ParseInt(sizeStr, 10, 64)
 		if err != nil {
 			return "", 0, casblob.Identity,
-				status.Errorf(codes.InvalidArgument, "Unable to parse size: %s from %q", rem[3], r)
+				status.Errorf(codes.InvalidArgument, "Unable to parse size: %s from %q", sizeStr, r)
 		}
 
 		if size < 0 {

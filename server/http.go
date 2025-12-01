@@ -49,6 +49,7 @@ type httpCache struct {
 	checkClientCertForReads  bool
 	checkClientCertForWrites bool
 	maxCasBlobSizeBytes      int64
+	hashFunction             string
 }
 
 type statusPageData struct {
@@ -67,7 +68,7 @@ type statusPageData struct {
 // accessLogger will print one line for each HTTP request to stdout.
 // errorLogger will print unexpected server errors. Inexistent files and malformed URLs will not
 // be reported.
-func NewHTTPCache(cache disk.Cache, accessLogger cache.Logger, errorLogger cache.Logger, validateAC bool, mangleACKeys bool, checkClientCertForReads bool, checkClientCertForWrites bool, commit string, gitTags string, maxCasBlobSizeBytes int64) HTTPCache {
+func NewHTTPCache(cache disk.Cache, accessLogger cache.Logger, errorLogger cache.Logger, validateAC bool, mangleACKeys bool, checkClientCertForReads bool, checkClientCertForWrites bool, hashFunction string, commit string, gitTags string, maxCasBlobSizeBytes int64) HTTPCache {
 
 	_, _, numItems, _ := cache.Stats()
 
@@ -82,6 +83,7 @@ func NewHTTPCache(cache disk.Cache, accessLogger cache.Logger, errorLogger cache
 		checkClientCertForReads:  checkClientCertForReads,
 		checkClientCertForWrites: checkClientCertForWrites,
 		maxCasBlobSizeBytes:      maxCasBlobSizeBytes,
+		hashFunction:             hashFunction,
 	}
 
 	if commit != "{STABLE_GIT_COMMIT}" {
@@ -221,7 +223,7 @@ func (h *httpCache) CacheHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if h.mangleACKeys && (kind == cache.AC || kind == cache.RAW) {
-		hash = cache.TransformActionCacheKey(hash, instance, h.accessLogger)
+		hash = cache.TransformActionCacheKey(hash, instance, h.hashFunction, h.accessLogger)
 	}
 
 	switch m := r.Method; m {
@@ -316,7 +318,7 @@ func (h *httpCache) CacheHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		if contentLength == 0 && kind == cache.CAS && hash != emptySha256 {
+		if contentLength == 0 && kind == cache.CAS && hash != emptySha256 && hash != emptyBlake3 {
 			msg := fmt.Sprintf("Invalid empty blob hash: \"%s\"", hash)
 			http.Error(w, msg, http.StatusBadRequest)
 			h.errorLogger.Printf("PUT %s: %s", path(kind, hash), msg)

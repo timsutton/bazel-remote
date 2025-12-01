@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"hash"
 	"io"
 
 	"google.golang.org/genproto/googleapis/rpc/code"
@@ -18,6 +19,7 @@ import (
 
 	"github.com/buchgr/bazel-remote/v2/cache"
 	"github.com/buchgr/bazel-remote/v2/utils/validate"
+	"github.com/zeebo/blake3"
 )
 
 var (
@@ -417,7 +419,7 @@ func (s *grpcServer) SpliceBlob(ctx context.Context, req *pb.SpliceBlobRequest) 
 				"SpliceBlob called with a negative Digest in SpliceBlobRequest.ChunkDigests")
 		}
 
-		if chunkDigest.SizeBytes == 0 || chunkDigest.Hash == emptySha256 {
+		if chunkDigest.SizeBytes == 0 || chunkDigest.Hash == emptySha256 || chunkDigest.Hash == emptyBlake3 {
 			return nil, grpc_status.Errorf(codes.InvalidArgument,
 				"SpliceBlob called with an empty blob in SpliceBlobRequest.ChunkDigests")
 		}
@@ -449,7 +451,12 @@ func (s *grpcServer) SpliceBlob(ctx context.Context, req *pb.SpliceBlobRequest) 
 
 		checkBlobDigestHashMatchesRegex = false // No need to check, if we hash ourselves
 
-		hasher := sha256.New()
+		var hasher hash.Hash
+		if s.hashFunction == "blake3" {
+			hasher = blake3.New()
+		} else {
+			hasher = sha256.New()
+		}
 
 		for _, chunkDigest := range req.ChunkDigests {
 			rc, _, err := s.cache.Get(ctx, cache.CAS, chunkDigest.Hash, chunkDigest.SizeBytes, 0)
@@ -504,7 +511,7 @@ func (s *grpcServer) SpliceBlob(ctx context.Context, req *pb.SpliceBlobRequest) 
 			req.BlobDigest.SizeBytes, s.maxCasBlobSizeBytes)
 	}
 
-	if req.BlobDigest.SizeBytes == 0 || req.BlobDigest.Hash == emptySha256 {
+	if req.BlobDigest.SizeBytes == 0 || req.BlobDigest.Hash == emptySha256 || req.BlobDigest.Hash == emptyBlake3 {
 		return nil, grpc_status.Errorf(codes.InvalidArgument,
 			"SpliceBlob called to create the empty blob?")
 	}
