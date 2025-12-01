@@ -263,7 +263,7 @@ func (s *grpcServer) parseReadResource(name string, errorPrefix string) (string,
 		return hash, size, casblob.Identity, nil
 	}
 
-	if !foundCompressedBlobs || len(rem) != 3 {
+	if !foundCompressedBlobs || (len(rem) != 3 && len(rem) != 4) {
 		msg := fmt.Sprintf("Unable to parse resource name: %s", name)
 		s.accessLogger.Printf("%s: %s", errorPrefix, msg)
 		return "", 0, casblob.Identity,
@@ -277,8 +277,31 @@ func (s *grpcServer) parseReadResource(name string, errorPrefix string) (string,
 			status.Error(codes.InvalidArgument, msg)
 	}
 
-	hash := rem[1]
-	sizeStr := rem[2]
+	// Format can be either:
+	// compressed-blobs/zstd/{hash}/{size} (old format, 3 elements)
+	// compressed-blobs/zstd/{hash_function}/{hash}/{size} (new format, 4 elements)
+
+	var hash string
+	var sizeStr string
+
+	if len(rem) == 4 {
+		// New format with hash function: compressed-blobs/zstd/{hash_function}/{hash}/{size}
+		// Check if rem[1] looks like a hash function name
+		if len(rem[1]) < 64 && strings.ToLower(rem[1]) == rem[1] && !validate.HashKeyRegex.MatchString(rem[1]) {
+			hash = rem[2]
+			sizeStr = rem[3]
+		} else {
+			// Looks like old format with extra segment
+			msg := fmt.Sprintf("Unable to parse resource name: %s", name)
+			s.accessLogger.Printf("%s: %s", errorPrefix, msg)
+			return "", 0, casblob.Zstandard,
+				status.Error(codes.InvalidArgument, msg)
+		}
+	} else {
+		// Old format: compressed-blobs/zstd/{hash}/{size}
+		hash = rem[1]
+		sizeStr = rem[2]
+	}
 
 	size, err := strconv.ParseInt(sizeStr, 10, 64)
 	if err != nil {
@@ -376,7 +399,23 @@ func (s *grpcServer) parseWriteResource(r string) (string, int64, casblob.Compre
 			status.Errorf(codes.InvalidArgument, "Unable to parse resource name: %s", r)
 	}
 
-	sizeStr := rem[4]
+	// Format can be either:
+	// uploads/{uuid}/compressed-blobs/zstd/{hash}/{size} (old format, 5 elements minimum)
+	// uploads/{uuid}/compressed-blobs/zstd/{hash_function}/{hash}/{size} (new format, 6 elements minimum)
+
+	var hash string
+	var sizeStr string
+
+	// Check if rem[3] looks like a hash function name or a hash
+	if len(rem) >= 6 && len(rem[3]) < 64 && strings.ToLower(rem[3]) == rem[3] && !validate.HashKeyRegex.MatchString(rem[3]) {
+		// New format with hash function: uploads/{uuid}/compressed-blobs/zstd/{hash_function}/{hash}/{size}
+		hash = rem[4]
+		sizeStr = rem[5]
+	} else {
+		// Old format: uploads/{uuid}/compressed-blobs/zstd/{hash}/{size}
+		hash = rem[3]
+		sizeStr = rem[4]
+	}
 
 	size, err := strconv.ParseInt(sizeStr, 10, 64)
 	if err != nil {
@@ -388,8 +427,6 @@ func (s *grpcServer) parseWriteResource(r string) (string, int64, casblob.Compre
 		return "", 0, casblob.Zstandard,
 			status.Errorf(codes.InvalidArgument, "Invalid size (must be non-negative): %d from %q", size, r)
 	}
-
-	hash := rem[3]
 	err = s.validateHash(hash, size, "GRPC BYTESTREAM READ FAILED")
 	if err != nil {
 		return "", 0, casblob.Zstandard, err
