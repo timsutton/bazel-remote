@@ -43,6 +43,7 @@ log_timezone: local
 		MaxSize:                     100,
 		StorageMode:                 "zstd",
 		ZstdImplementation:          "go",
+		HashFunction:                "sha256",
 		HtpasswdFile:                "/opt/.htpasswd",
 		MinTLSVersion:               "1.0",
 		TLSCertFile:                 "/opt/tls.cert",
@@ -90,6 +91,7 @@ gcs_proxy:
 		MaxSize:            100,
 		StorageMode:        "zstd",
 		ZstdImplementation: "go",
+		HashFunction:       "sha256",
 		GoogleCloudStorage: &GoogleCloudStorageConfig{
 			Bucket:                "gcs-bucket",
 			UseDefaultCredentials: false,
@@ -136,6 +138,7 @@ http_proxy:
 		MaxSize:            100,
 		StorageMode:        "zstd",
 		ZstdImplementation: "go",
+		HashFunction:       "sha256",
 		HTTPBackend: &URLBackendConfig{
 			BaseURL: url,
 		},
@@ -156,9 +159,10 @@ http_proxy:
 
 func TestDirRequired(t *testing.T) {
 	testConfig := &Config{
-		HTTPAddress: "localhost:8080",
-		GRPCAddress: "localhost:9092",
-		MaxSize:     100,
+		HTTPAddress:  "localhost:8080",
+		GRPCAddress:  "localhost:9092",
+		MaxSize:      100,
+		HashFunction: "sha256",
 	}
 	err := validateConfig(testConfig)
 	if err == nil {
@@ -171,9 +175,10 @@ func TestDirRequired(t *testing.T) {
 
 func TestMaxSizeRequired(t *testing.T) {
 	testConfig := &Config{
-		HTTPAddress: "localhost:8080",
-		GRPCAddress: "localhost:9092",
-		Dir:         "/opt/cache-dir",
+		HTTPAddress:  "localhost:8080",
+		GRPCAddress:  "localhost:9092",
+		Dir:          "/opt/cache-dir",
+		HashFunction: "sha256",
 	}
 	err := validateConfig(testConfig)
 	if err == nil {
@@ -208,6 +213,7 @@ s3_proxy:
 		MaxSize:            100,
 		StorageMode:        "zstd",
 		ZstdImplementation: "go",
+		HashFunction:       "sha256",
 		S3CloudStorage: &S3CloudStorageConfig{
 			Endpoint:        "minio.example.com:9000",
 			Bucket:          "test-bucket",
@@ -256,6 +262,7 @@ ldap:
 		MaxSize:            100,
 		StorageMode:        "zstd",
 		ZstdImplementation: "go",
+		HashFunction:       "sha256",
 		LDAP: &LDAPConfig{
 			URL:               "ldap://ldap.example.com",
 			BaseDN:            "OU=My Users,DC=example,DC=com",
@@ -298,6 +305,7 @@ profile_address: :7070
 		MaxSize:                42,
 		StorageMode:            "zstd",
 		ZstdImplementation:     "go",
+		HashFunction:           "sha256",
 		ProfileAddress:         ":7070",
 		NumUploaders:           100,
 		MinTLSVersion:          "1.0",
@@ -347,6 +355,7 @@ endpoint_metrics_duration_buckets: [.005, .1, 5]
 		MaxSize:                42,
 		StorageMode:            "zstd",
 		ZstdImplementation:     "go",
+		HashFunction:           "sha256",
 		MinTLSVersion:          "1.0",
 		NumUploaders:           100,
 		MaxQueuedUploads:       1000000,
@@ -371,6 +380,7 @@ func TestMetricsDurationBucketsNoDuplicates(t *testing.T) {
 		Dir:                    "/opt/cache-dir",
 		StorageMode:            "uncompressed",
 		ZstdImplementation:     "go",
+		HashFunction:           "sha256",
 		MetricsDurationBuckets: []float64{1, 2, 3, 3},
 	}
 	err := validateConfig(testConfig)
@@ -450,6 +460,7 @@ func TestHttpGrpcServerPortConflict(t *testing.T) {
 		MaxSize:            100,
 		StorageMode:        "zstd",
 		ZstdImplementation: "go",
+		HashFunction:       "sha256",
 	}
 	err := validateConfig(testConfig)
 	if err == nil {
@@ -479,6 +490,7 @@ storage_mode: zstd
 		MaxSize:                42,
 		StorageMode:            "zstd",
 		ZstdImplementation:     "go",
+		HashFunction:           "sha256",
 		NumUploaders:           100,
 		MinTLSVersion:          "1.0",
 		MaxQueuedUploads:       1000000,
@@ -513,6 +525,7 @@ storage_mode: zstd
 		MaxSize:                42,
 		StorageMode:            "zstd",
 		ZstdImplementation:     "go",
+		HashFunction:           "sha256",
 		NumUploaders:           100,
 		MinTLSVersion:          "1.0",
 		MaxQueuedUploads:       1000000,
@@ -535,6 +548,7 @@ func TestSocketPathMissing(t *testing.T) {
 		MaxSize:            100,
 		StorageMode:        "zstd",
 		ZstdImplementation: "go",
+		HashFunction:       "sha256",
 	}
 	err := validateConfig(testConfig)
 	if err == nil {

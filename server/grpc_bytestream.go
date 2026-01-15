@@ -14,7 +14,6 @@ import (
 
 	"github.com/buchgr/bazel-remote/v2/cache"
 	"github.com/buchgr/bazel-remote/v2/cache/disk/casblob"
-	"github.com/buchgr/bazel-remote/v2/utils/validate"
 
 	"github.com/buchgr/bazel-remote/v2/utils/zstdpool"
 	syncpool "github.com/mostynb/zstdpool-syncpool"
@@ -219,17 +218,21 @@ func (s *grpcServer) parseReadResource(name string, errorPrefix string) (string,
 
 		if len(rem) == 3 {
 			// New format with hash function: blobs/{hash_function}/{hash}/{size}
-			// Check if rem[0] looks like a hash function name
-			if len(rem[0]) < 64 && strings.ToLower(rem[0]) == rem[0] && !validate.HashKeyRegex.MatchString(rem[0]) {
-				hash = rem[1]
-				sizeStr = rem[2]
-			} else {
-				// Unexpected format
-				msg := fmt.Sprintf("Unable to parse resource name: %s", name)
+			hashFunction := rem[0]
+			if !isSupportedHashFunction(hashFunction) {
+				msg := fmt.Sprintf("Unsupported hash function in resource name: %s", name)
 				s.accessLogger.Printf("%s: %s", errorPrefix, msg)
 				return "", 0, casblob.Identity,
 					status.Error(codes.InvalidArgument, msg)
 			}
+			if hashFunction != s.hashFunction {
+				msg := fmt.Sprintf("Unsupported hash function %q (configured %q)", hashFunction, s.hashFunction)
+				s.accessLogger.Printf("%s: %s", errorPrefix, msg)
+				return "", 0, casblob.Identity,
+					status.Error(codes.InvalidArgument, msg)
+			}
+			hash = rem[1]
+			sizeStr = rem[2]
 		} else if len(rem) == 2 {
 			// Old format: blobs/{hash}/{size}
 			hash = rem[0]
@@ -286,17 +289,21 @@ func (s *grpcServer) parseReadResource(name string, errorPrefix string) (string,
 
 	if len(rem) == 4 {
 		// New format with hash function: compressed-blobs/zstd/{hash_function}/{hash}/{size}
-		// Check if rem[1] looks like a hash function name
-		if len(rem[1]) < 64 && strings.ToLower(rem[1]) == rem[1] && !validate.HashKeyRegex.MatchString(rem[1]) {
-			hash = rem[2]
-			sizeStr = rem[3]
-		} else {
-			// Looks like old format with extra segment
-			msg := fmt.Sprintf("Unable to parse resource name: %s", name)
+		hashFunction := rem[1]
+		if !isSupportedHashFunction(hashFunction) {
+			msg := fmt.Sprintf("Unsupported hash function in resource name: %s", name)
 			s.accessLogger.Printf("%s: %s", errorPrefix, msg)
 			return "", 0, casblob.Zstandard,
 				status.Error(codes.InvalidArgument, msg)
 		}
+		if hashFunction != s.hashFunction {
+			msg := fmt.Sprintf("Unsupported hash function %q (configured %q)", hashFunction, s.hashFunction)
+			s.accessLogger.Printf("%s: %s", errorPrefix, msg)
+			return "", 0, casblob.Zstandard,
+				status.Error(codes.InvalidArgument, msg)
+		}
+		hash = rem[2]
+		sizeStr = rem[3]
 	} else {
 		// Old format: compressed-blobs/zstd/{hash}/{size}
 		hash = rem[1]
@@ -358,14 +365,12 @@ func (s *grpcServer) parseWriteResource(r string) (string, int64, casblob.Compre
 		var hash string
 		var sizeStr string
 
-		// Check if rem[2] looks like a hash function name (sha256, blake3, etc) or a hash
-		// Hash functions are lowercase ascii letters, hashes are hex digits
-		if len(rem[2]) < 64 && strings.ToLower(rem[2]) == rem[2] && !validate.HashKeyRegex.MatchString(rem[2]) {
+		if len(rem) >= 5 && isSupportedHashFunction(rem[2]) {
 			// This looks like a hash function name, so the format is:
 			// uploads/{uuid}/blobs/{hash_function}/{hash}/{size}
-			if len(rem) < 5 {
+			if rem[2] != s.hashFunction {
 				return "", 0, casblob.Identity,
-					status.Errorf(codes.InvalidArgument, "Unable to parse resource name: %s", r)
+					status.Errorf(codes.InvalidArgument, "Unsupported hash function %q (configured %q)", rem[2], s.hashFunction)
 			}
 			hash = rem[3]
 			sizeStr = rem[4]
@@ -406,9 +411,12 @@ func (s *grpcServer) parseWriteResource(r string) (string, int64, casblob.Compre
 	var hash string
 	var sizeStr string
 
-	// Check if rem[3] looks like a hash function name or a hash
-	if len(rem) >= 6 && len(rem[3]) < 64 && strings.ToLower(rem[3]) == rem[3] && !validate.HashKeyRegex.MatchString(rem[3]) {
+	if len(rem) >= 6 && isSupportedHashFunction(rem[3]) {
 		// New format with hash function: uploads/{uuid}/compressed-blobs/zstd/{hash_function}/{hash}/{size}
+		if rem[3] != s.hashFunction {
+			return "", 0, casblob.Zstandard,
+				status.Errorf(codes.InvalidArgument, "Unsupported hash function %q (configured %q)", rem[3], s.hashFunction)
+		}
 		hash = rem[4]
 		sizeStr = rem[5]
 	} else {
@@ -433,6 +441,10 @@ func (s *grpcServer) parseWriteResource(r string) (string, int64, casblob.Compre
 	}
 
 	return hash, size, casblob.Zstandard, nil
+}
+
+func isSupportedHashFunction(hashFunction string) bool {
+	return hashFunction == "sha256" || hashFunction == "blake3"
 }
 
 var errWriteOffset error = errors.New("bytestream writes from non-zero offsets are unsupported")
