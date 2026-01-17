@@ -5,7 +5,7 @@ go_library(
     srcs = ["sha256verifier.go"],
     importpath = "github.com/buchgr/bazel-remote/v2/utils/sha256verifier",
     visibility = ["//visibility:public"],
-    deps = ["@com_github_zeebo_blake3//:go_default_library"],
+    deps = ["@com_lukechampine_blake3//:go_default_library"],
 )
 
 go_test(

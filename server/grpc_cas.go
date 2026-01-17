@@ -19,7 +19,7 @@ import (
 
 	"github.com/buchgr/bazel-remote/v2/cache"
 	"github.com/buchgr/bazel-remote/v2/utils/validate"
-	"github.com/zeebo/blake3"
+	"lukechampine.com/blake3"
 )
 
 var (
@@ -453,7 +453,7 @@ func (s *grpcServer) SpliceBlob(ctx context.Context, req *pb.SpliceBlobRequest) 
 
 		var hasher hash.Hash
 		if s.hashFunction == "blake3" {
-			hasher = blake3.New()
+			hasher = blake3.New(32, nil)
 		} else {
 			hasher = sha256.New()
 		}

@@ -7,7 +7,7 @@ import (
 	"hash"
 	"io"
 
-	"github.com/zeebo/blake3"
+	"lukechampine.com/blake3"
 )
 
 type sha256verifier struct {
@@ -38,7 +38,7 @@ func NewWithAlgorithm(algorithm HashAlgorithm, expectedHash string, expectedSize
 
 	switch algorithm {
 	case BLAKE3:
-		h = blake3.New()
+		h = blake3.New(32, nil)
 	case SHA256:
 		fallthrough
 	default:

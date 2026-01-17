@@ -7,7 +7,7 @@ go_library(
     visibility = ["//visibility:public"],
     deps = [
         "//cache/disk/zstdimpl:go_default_library",
-        "@com_github_zeebo_blake3//:go_default_library",
+        "@com_lukechampine_blake3//:go_default_library",
     ],
 )
 

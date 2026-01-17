@@ -7,7 +7,7 @@ import (
 	"hash"
 	"io"
 
-	"github.com/zeebo/blake3"
+	"lukechampine.com/blake3"
 )
 
 // EntryKind describes the kind of cache entry
@@ -98,7 +98,7 @@ func TransformActionCacheKey(key, instance, hashAlgorithm string, logger Logger)
 
 	var h hash.Hash
 	if hashAlgorithm == "blake3" {
-		h = blake3.New()
+		h = blake3.New(32, nil)
 	} else {
 		h = sha256.New()
 	}

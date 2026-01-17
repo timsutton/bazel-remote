@@ -14,7 +14,7 @@ import (
 	"sync"
 
 	"github.com/buchgr/bazel-remote/v2/cache/disk/zstdimpl"
-	"github.com/zeebo/blake3"
+	"lukechampine.com/blake3"
 )
 
 type CompressionType uint8
@@ -563,7 +563,7 @@ func WriteAndClose(zstd zstdimpl.ZstdImpl, r io.Reader, f *os.File, t Compressio
 	if t == Identity {
 		var hasher hashpkg.Hash
 		if hashAlgorithm == "blake3" {
-			hasher = blake3.New()
+			hasher = blake3.New(32, nil)
 		} else {
 			hasher = sha256.New()
 		}
@@ -601,7 +601,7 @@ func WriteAndClose(zstd zstdimpl.ZstdImpl, r io.Reader, f *os.File, t Compressio
 
 	var hasher hashpkg.Hash
 	if hashAlgorithm == "blake3" {
-		hasher = blake3.New()
+		hasher = blake3.New(32, nil)
 	} else {
 		hasher = sha256.New()
 	}
